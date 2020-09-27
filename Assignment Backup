@@ -1,0 +1,716 @@
+"""
+Semester 2, 2018
+"""
+__author__ = "Steve Fan"
+
+import random
+import threading
+import tkinter.font as tkFont
+from tkinter import *
+from tkinter import messagebox
+from tkinter.simpledialog import askstring
+import time
+
+
+class Game:
+    def __init__(self, master):
+        self.root = master
+        self.canvas = Canvas(master, width=500, height=500, bd=0, highlightthickness=0, highlightbackground="Red",
+                             bg="Black")
+        self.canvas.pack(padx=10, pady=10)
+        self.score = Label(master, text="Score: 00", font="Consolas 14 bold")
+        self.score.pack()
+        master.update()
+        self.canvas.create_text(250, 250, text="Press Enter to start Game!!", fill="red", font="Consolas 18")
+        master.bind_all("<Return>", self.start_game)
+        self.playing = False
+
+    def start_game(self, event):
+        if self.playing is False:
+            self.playing = True
+            self.score.configure(text="Score: 00")
+            self.canvas.delete("all")
+            BALL_COLOR = ["red", "yellow", "white"]
+            BRICK_COLOR = ["PeachPuff3", "dark slate gray", "rosy brown", "light goldenrod yellow", "turquoise3",
+                           "salmon",
+                           "light steel blue", "dark khaki", "pale violet red", "orchid", "tan", "MistyRose2",
+                           "DodgerBlue4", "wheat2", "RosyBrown2", "bisque3", "DarkSeaGreen1"]
+            random.shuffle(BALL_COLOR)
+            paddle = Paddle(self.canvas, "blue")
+            bricks = []
+            for i in range(0, 5):
+                b = []
+                for j in range(0, 19):
+                    random.shuffle(BRICK_COLOR)
+                    tmp = Bricks(self.canvas, BRICK_COLOR[0])
+                    b.append(tmp)
+                bricks.append(b)
+
+            for i in range(0, 5):
+                for j in range(0, 19):
+                    self.canvas.move(bricks[i][j].id, 25 * j, 25 * i)
+
+            ball = Ball(self.canvas, BALL_COLOR[0], paddle, bricks, self.score)
+            self.root.update_idletasks()
+            self.root.update()
+
+            time.sleep(1)
+            while 1:
+                if paddle.pausec != 1:
+                    try:
+                        self.canvas.delete(m)
+                        del m
+                    except:
+                        pass
+                    if not ball.bottom_hit:
+                        ball.draw()
+                        paddle.draw()
+                        self.root.update_idletasks()
+                        self.root.update()
+                        time.sleep(0.01)
+                        if ball.hit == 95:
+                            self.canvas.create_text(250, 250, text="YOU WON !!", fill="yellow", font="Consolas 24 ")
+                            self.root.update_idletasks()
+                            self.root.update()
+                            self.playing = False
+                            break
+                    else:
+                        self.canvas.create_text(250, 250, text="GAME OVER!!", fill="red", font="Consolas 24 ")
+                        self.root.update_idletasks()
+                        self.root.update()
+                        self.playing = False
+                        break
+                else:
+                    try:
+                        if m == None: pass
+                    except:
+                        m = self.canvas.create_text(250, 250, text="PAUSE!!", fill="green", font="Consolas 24 ")
+                    self.root.update_idletasks()
+                    self.root.update()
+
+
+class Ball:
+    def __init__(self, canvas, color, paddle, bricks, score):
+        self.bricks = bricks
+        self.canvas = canvas
+        self.paddle = paddle
+        self.score = score
+        self.bottom_hit = False
+        self.hit = 0
+        self.id = canvas.create_oval(10, 10, 25, 25, fill=color, width=1)
+        self.canvas.move(self.id, 230, 461)
+        start = [4, 3.8, 3.6, 3.4, 3.2, 3, 2.8, 2.6]
+        random.shuffle(start)
+
+        self.x = start[0]
+        self.y = -start[0]
+        self.canvas.move(self.id, self.x, self.y)
+        self.canvas_height = canvas.winfo_height()
+        self.canvas_width = canvas.winfo_width()
+
+    def brick_hit(self, pos):
+        for brick_line in self.bricks:
+            for brick in brick_line:
+                brick_pos = self.canvas.coords(brick.id)
+                try:
+                    if pos[2] >= brick_pos[0] and pos[0] <= brick_pos[2]:
+                        if pos[3] >= brick_pos[1] and pos[1] <= brick_pos[3]:
+                            self.canvas.bell()
+                            self.hit += 1
+                            self.score.configure(text="Score: " + str(self.hit))
+                            self.canvas.delete(brick.id)
+                            return True
+                except:
+                    continue
+        return False
+
+    def paddle_hit(self, pos):
+        paddle_pos = self.canvas.coords(self.paddle.id)
+        if pos[2] >= paddle_pos[0] and pos[0] <= paddle_pos[2]:
+            if pos[3] >= paddle_pos[1] and pos[1] <= paddle_pos[3]:
+                return True
+            return False
+
+    def draw(self):
+        self.canvas.move(self.id, self.x, self.y)
+        pos = self.canvas.coords(self.id)
+        start = [4, 3.8, 3.6, 3.4, 3.2, 3, 2.8, 2.6]
+        random.shuffle(start)
+        if self.brick_hit(pos):
+            self.y = start[0]
+        if pos[1] <= 0:
+            self.y = start[0]
+        if pos[3] >= self.canvas_height:
+            self.bottom_hit = True
+        if pos[0] <= 0:
+            self.x = start[0]
+        if pos[2] >= self.canvas_width:
+            self.x = -start[0]
+        if self.paddle_hit(pos):
+            self.y = -start[0]
+
+
+class Paddle:
+    def __init__(self, canvas, color):
+        self.canvas = canvas
+        self.id = canvas.create_rectangle(0, 0, 100, 10, fill=color)
+        self.canvas.move(self.id, 200, 485)
+        self.x = 0
+        self.pausec = 0
+        self.canvas_width = canvas.winfo_width()
+        self.canvas.bind_all("<Left>", self.turn_left)
+        self.canvas.bind_all("<Right>", self.turn_right)
+        self.canvas.bind_all("<space>", self.pauser)
+
+    def draw(self):
+        pos = self.canvas.coords(self.id)
+        # print(pos)
+        if pos[0] + self.x <= 0:
+            self.x = 0
+        if pos[2] + self.x >= self.canvas_width:
+            self.x = 0
+        self.canvas.move(self.id, self.x, 0)
+
+    def turn_left(self, event):
+        self.x = -3.5
+
+    def turn_right(self, event):
+        self.x = 3.5
+
+    def pauser(self, event):
+        self.pausec += 1
+        if self.pausec == 2:
+            self.pausec = 0
+
+
+class Bricks:
+    def __init__(self, canvas, color):
+        self.canvas = canvas
+        self.id = canvas.create_oval(5, 5, 25, 25, fill=color, width=2)
+
+
+class Question:
+    def __init__(self, name, count):
+        self.name = name
+        self.count = count
+        self.time = 0
+        self.accept = False
+        self.widget = []
+
+
+class MainBody(Frame):
+    
+    def __init__(self, master=None):
+        
+        super().__init__(master, bg="White")
+        
+        self.LongQuestions = []
+        self.QuickQuestions = []
+
+        self.master.title('CSSE7030 Queue')
+        self.topwindow_master = None
+        self.pack(side=TOP, expand=YES, fill=BOTH, anchor=N)
+        self.createWidgets()
+
+        #Timer#
+        self.timer = threading.Timer(1, self.update_every_tensec)
+        self.timer.start()
+
+    
+    def createWidgets(self): # Main body of window and GUI #
+        
+        self.frame_top = Frame(self, bg='Light Yellow', padx=25, pady=10)
+        self.frame_top.pack(side=TOP, fill=X)
+        
+        self.label_important = Label(self.frame_top, bg='Light Yellow', fg='darkgoldenrod', text="Important",font=tkFont.Font(family='Calibri', size=18, weight=tkFont.BOLD))
+        self.label_important.pack(side=TOP, anchor=W)
+        
+        self.label_description = Label(self.frame_top, bg='Light Yellow', text=
+        "Individual assessment items must be solely your own work. While students are encouraged to have high-level conversations about the problems they are\ntrying to solve, you must not look at another student's code or copy from it."
+        " The university users sophisticated anti-collusion measures to automatically\ndetect similarity between assignment submissions", justify='left')
+        self.label_description.pack(side=TOP, anchor=W)
+
+        self.button_master=Button(self.frame_top,text="Queue Stat",relief=SOLID,bg="Light Blue",fg="White",command=self.button_master_cmd)  
+
+        self.button_master.pack(side=TOP, anchor=W,pady=(10,0))
+
+        self.frame_middle_question = Frame(self, bg='White')
+        self.frame_middle_question.pack(fill=X)
+
+        # Short Questions """
+        self.frame_middle_question_left = Frame(self.frame_middle_question, bg="White")
+        self.frame_middle_question_left_top = Frame(self.frame_middle_question_left, bg='palegreen')
+        self.label_QuickQuestions = Label(self.frame_middle_question_left_top, text="Quick Questions", fg="seagreen",bg="palegreen", font=tkFont.Font(family='Arial', size=24, weight=tkFont.BOLD))
+        self.label_QuickQuestions_wait = Label(self.frame_middle_question_left_top, text="<2 mins with a tutor",bg="palegreen")
+
+        self.label_QuickQuestions.pack(pady=20)
+        self.label_QuickQuestions_wait.pack(pady=10)
+        self.frame_middle_question_left_top.pack(fill=X)
+        self.frame_middle_question_left.pack(side=LEFT, expand=YES, fill=X, padx=25, pady=20)
+        
+        # Long Questions #
+        self.frame_middle_question_right = Frame(self.frame_middle_question, bg="White")
+        self.frame_middle_question_right_top = Frame(self.frame_middle_question_right, bg='skyblue')
+        self.label_LongQuestions = Label(self.frame_middle_question_right_top, text="Long Questions", fg="#106E92",bg="skyblue", font=tkFont.Font(family='Arial', size=24, weight=tkFont.BOLD))
+        self.label_LongQuestions_wait = Label(self.frame_middle_question_right_top, text=">2 mins with a tutor",bg="skyblue")
+
+        self.label_LongQuestions.pack(pady=20)
+        self.label_LongQuestions_wait.pack(pady=10)
+        self.frame_middle_question_right_top.pack(fill=X)
+        self.frame_middle_question_right.pack(side=LEFT, expand=YES, fill=X, padx=25, pady=20)
+
+        # Descriptions of both Queues #
+        self.frame_middleQuestionExample = Frame(self, bg='White')
+        self.frame_middleQuestionExample.pack(fill=X)
+        
+        self.frame_middleQuestionExample_left = Frame(self.frame_middleQuestionExample, bg="White")
+        self.frame_middleQuestionExample_left.pack(side=LEFT, fill=X,expand=YES, padx=(25, 0))
+
+        self.label_QuickQuestion_example = Label(self.frame_middleQuestionExample_left, text="Some examples of quick questions:", bg="White")
+        self.label_QuickQuestion_example.pack(anchor=W)
+        self.frame_middleQuestionExample_left_top = Frame(self.frame_middleQuestionExample_left, bg="White")
+        self.frame_middleQuestionExample_left_top.pack(fill=X, padx=(25, 0))
+
+        self.label_QuickQuestion_example1 = Label(self.frame_middleQuestionExample_left_top, text="· Syntax errors", bg="White")
+        self.label_QuickQuestion_example1.pack(anchor=W)
+        
+        self.label_QuickQuestion_example2 = Label(self.frame_middleQuestionExample_left_top, text="· Interpreting error output", bg="White")
+        self.label_QuickQuestion_example2.pack(anchor=W)
+        
+        self.label_QuickQuestion_example3 = Label(self.frame_middleQuestionExample_left_top,text="· Assignment/MyPyTutor interpretation", bg="White")
+        self.label_QuickQuestion_example3.pack(anchor=W)
+        
+        self.label_QuickQuestion_example4 = Label(self.frame_middleQuestionExample_left_top,text="· MyPyTutor submission issues", bg="White")
+        self.label_QuickQuestion_example4.pack(anchor=W)
+
+        self.frame_middleQuestionExample_right= Frame(self.frame_middleQuestionExample, bg="White")
+        self.frame_middleQuestionExample_right.pack(side=LEFT, fill=X, expand=YES)
+        
+        self.label_LongQuestion_example = Label(self.frame_middleQuestionExample_right, text="Some examples of long questions:", bg="White")
+        self.label_LongQuestion_example.pack(anchor=W)
+        
+        self.frame_middleQuestionExample_right_top = Frame(self.frame_middleQuestionExample_right, bg="White")
+        self.frame_middleQuestionExample_right_top.pack(fill=X, padx=(25, 0))
+
+        self.label_LongQuestion_example1 = Label(self.frame_middleQuestionExample_right_top, text="· Open ended questions", bg="White")
+        self.label_LongQuestion_example1.pack(anchor=W)
+        
+        self.label_LongQuestion_example2 = Label(self.frame_middleQuestionExample_right_top, text="· How to start a problem", bg="White")
+        self.label_LongQuestion_example2.pack(anchor=W)
+        
+        self.label_LongQuestion_example3 = Label(self.frame_middleQuestionExample_right_top, text="· How to improve code", bg="White")
+        self.label_LongQuestion_example3.pack(anchor=W)
+        
+        self.label_LongQuestion_example4 = Label(self.frame_middleQuestionExample_right_top, text="· Debugging", bg="White")
+        self.label_LongQuestion_example4.pack(anchor=W)
+        
+        self.label_LongQuestion_example5 = Label(self.frame_middleQuestionExample_right_top, text="· Assignment help", bg="White")
+        self.label_LongQuestion_example5.pack(anchor=W)
+
+        # Queue Request Buttons #
+        
+        self.frame_middle_question_button = Frame(self, bg="White")
+        self.frame_middle_question_button.pack(fill=X, expand=YES)
+        
+        self.frame_middle_question_button_top = Frame(self.frame_middle_question_button, bg="White")
+        self.frame_middle_question_button_top.pack(fill=X, expand=YES)
+        
+        self.button_request_quick_help = Button(self.frame_middle_question_button_top, text="Request Quick Help", fg="White", bg="mediumaquamarine", takefocus=FALSE, padx=10, pady=10,
+                                                relief=SOLID, highlightcolor="limegreen", font=tkFont.Font(family='Arial', size=12), command=self.QQuestionsCommand,
+                                                highlightthickness=2,highlightbackground="limegreen")
+        self.button_request_quick_help.pack(side=LEFT, fill=X, expand=YES, pady=(30, 10), padx=150)
+
+        self.button_request_long_help = Button(self.frame_middle_question_button_top, text="Request Long Help",fg="White", bg="skyblue", takefocus=FALSE, padx=10, pady=10,
+                                               relief=SOLID, highlightcolor="#deepskyblue",font=tkFont.Font(family='Arial', size=12),command=self.LQuestionsCommand,
+                                               highlightthickness=2,highlightbackground="deepskyblue")
+        self.button_request_long_help.pack(side=LEFT, fill=X, expand=YES, pady=(30, 10), padx=150)
+
+
+        # statistics window frame #
+        self.frame_statistics = Frame(self, bg="White")
+        self.frame_statistics_line_top = Frame(self.frame_statistics, bg="White")
+        self.frame_statistics_line_top_QuickQuestions = Frame(self.frame_statistics_line_top, bg="gainsboro", height=2)
+        self.frame_statistics_line_top_LongQuestions = Frame(self.frame_statistics_line_top, bg="gainsboro", height=2)
+
+        self.frame_statistics_questions = Frame(self.frame_statistics, bg="White")
+        self.label_statistics_QuickQuestions = Label(self.frame_statistics_questions, bg="White",
+                                                      text="No students in queue.")
+        self.label_statistics_LongQuestions = Label(self.frame_statistics_questions, bg="White",
+                                                     text="No students in queue.")
+
+        self.frame_statistics_line_bottom = Frame(self.frame_statistics, bg="White")
+        self.frame_statistics_line_bottom_QuickQuestions = Frame(self.frame_statistics_line_bottom, bg="gainsboro",
+                                                                  height=2)
+        self.frame_statistics_line_bottom_LongQuestions = Frame(self.frame_statistics_line_bottom, bg="gainsboro",
+                                                                 height=2)
+
+        self.frame_statistics_line_top_QuickQuestions.pack(side=LEFT, fill=X, expand=YES, padx=25, pady=10)
+        self.frame_statistics_line_top_LongQuestions.pack(side=LEFT, fill=X, expand=YES, padx=25, pady=10)
+        self.frame_statistics_line_top.pack(fill=X)
+
+        self.label_statistics_QuickQuestions.pack(side=LEFT, anchor=W, expand=YES, padx=25)
+        self.label_statistics_LongQuestions.pack(side=LEFT, anchor=W, expand=YES, padx=25)
+        self.frame_statistics_questions.pack(fill=X)
+
+        self.frame_statistics_line_bottom_QuickQuestions.pack(side=LEFT, fill=X, expand=YES, padx=25, pady=10)
+        self.frame_statistics_line_bottom_LongQuestions.pack(side=LEFT, fill=X, expand=YES, padx=25, pady=10)
+        self.frame_statistics_line_bottom.pack(fill=X)
+        self.frame_statistics.pack(fill=X)
+
+        self.frame_table = Frame(self, bg="White")
+        self.frame_table_header = Frame(self.frame_table, bg="White")
+        self.frame_table_header_QuickQuestions = Frame(self.frame_table_header, bg="White")
+        self.label_QuickQuestion_col_1 = Label(self.frame_table_header_QuickQuestions, text="#", width=2, anchor=W,font=tkFont.Font(family='Arial', size=10, weight=tkFont.BOLD),bg="White")
+        self.label_QuickQuestion_col_2 = Label(self.frame_table_header_QuickQuestions, text="Name", width=12,anchor=W, font=tkFont.Font(family='Arial', size=10, weight=tkFont.BOLD),bg="White")
+        self.label_QuickQuestion_col_3 = Label(self.frame_table_header_QuickQuestions, text="Questions Asked",width=14, anchor=W,font=tkFont.Font(family='Arial', size=10, weight=tkFont.BOLD),bg="White")
+        self.label_QuickQuestion_col_4 = Label(self.frame_table_header_QuickQuestions, text="Time", width=15,anchor=W, font=tkFont.Font(family='Arial', size=10, weight=tkFont.BOLD),bg="White")
+
+        self.frame_table_header_LongQuestions = Frame(self.frame_table_header, bg="White")
+        self.label_LongQuestion_col_1 = Label(self.frame_table_header_LongQuestions, text="#", width=2, anchor=W,font=tkFont.Font(family='Arial', size=10, weight=tkFont.BOLD),bg="White")
+        self.label_LongQuestion_col_2 = Label(self.frame_table_header_LongQuestions, text="Name", width=12, anchor=W,font=tkFont.Font(family='Arial', size=10, weight=tkFont.BOLD),bg="White")
+        self.label_LongQuestion_col_3 = Label(self.frame_table_header_LongQuestions, text="Questions Asked", width=14,anchor=W, font=tkFont.Font(family='Arial', size=10, weight=tkFont.BOLD),bg="White")
+        self.label_LongQuestion_col_4 = Label(self.frame_table_header_LongQuestions, text="Time", width=15, anchor=W,font=tkFont.Font(family='Arial', size=10, weight=tkFont.BOLD),bg="White")
+
+        self.frame_table_header_line = Frame(self.frame_table, bg="White")
+        self.frame_table_header_QuickQuestions_line = Frame(self.frame_table_header_line, bg="gainsboro", height=2)
+        self.frame_table_header_LongQuestions_line = Frame(self.frame_table_header_line, bg="gainsboro", height=2)
+
+        self.label_QuickQuestion_col_1.pack(side=LEFT)
+        self.label_QuickQuestion_col_2.pack(side=LEFT)
+        self.label_QuickQuestion_col_3.pack(side=LEFT)
+        self.label_QuickQuestion_col_4.pack(side=LEFT, fill=X, expand=YES)
+        self.frame_table_header_QuickQuestions.pack(side=LEFT, fill=X, expand=YES, padx=25)
+        self.label_LongQuestion_col_1.pack(side=LEFT)
+        self.label_LongQuestion_col_2.pack(side=LEFT)
+        self.label_LongQuestion_col_3.pack(side=LEFT)
+        self.label_LongQuestion_col_4.pack(side=LEFT, fill=X, expand=YES)
+        self.frame_table_header_LongQuestions.pack(side=LEFT, fill=X, expand=YES, padx=25)
+        self.frame_table_header.pack(fill=X)
+
+        self.frame_table_header_QuickQuestions_line.pack(side=LEFT, fill=X, expand=YES, padx=25, pady=10)
+        self.frame_table_header_LongQuestions_line.pack(side=LEFT, fill=X, expand=YES, padx=25, pady=10)
+        self.frame_table_header_line.pack(fill=X)
+        self.frame_table.pack(fill=X)
+
+        self.frame_display = Frame(self, bg="White")
+        self.frame_display_quick_quesitons = Frame(self.frame_display, bg="White")
+        self.frame_display_long_quesitons = Frame(self.frame_display, bg="White")
+
+        self.canvas_QuickQuestions = Canvas(self.frame_display_quick_quesitons, bg="White")
+        self.frame_canvas_QuickQuestions = Frame(self.canvas_QuickQuestions, bg="White")
+        self.scrollbar_QuickQuestions = Scrollbar(self.frame_display_quick_quesitons, orient=VERTICAL,
+                                                   command=self.canvas_QuickQuestions.yview, bg="White")
+        self.canvas_QuickQuestions.configure(yscrollcommand=self.scrollbar_QuickQuestions.set)
+        self.canvas_QuickQuestions.create_window((0, 0), window=self.frame_canvas_QuickQuestions, anchor=N + W)
+        self.frame_canvas_QuickQuestions.bind("<Configure>", lambda event: self.canvas_QuickQuestions.configure(scrollregion=self.canvas_QuickQuestions.bbox("all"), width=420, height=200))
+
+        self.canvas_LongQuestions = Canvas(self.frame_display_long_quesitons, bg="White")
+        self.frame_canvas_LongQuestions = Frame(self.canvas_LongQuestions, bg="White")
+        self.scrollbar_LongQuestions = Scrollbar(self.frame_display_long_quesitons, orient=VERTICAL,command=self.canvas_LongQuestions.yview)
+        
+        self.canvas_LongQuestions.configure(yscrollcommand=self.scrollbar_LongQuestions.set)
+        self.canvas_LongQuestions.create_window((0, 0), window=self.frame_canvas_LongQuestions, anchor=N + W)
+        self.frame_canvas_LongQuestions.bind("<Configure>", lambda event: self.canvas_LongQuestions.configure(scrollregion=self.canvas_LongQuestions.bbox("all"), width=420, height=200))
+
+        self.canvas_QuickQuestions.pack(side=LEFT, fill=X, expand=YES)
+        self.scrollbar_QuickQuestions.pack(side=LEFT, fill=Y)
+        self.canvas_LongQuestions.pack(side=LEFT, fill=X, expand=YES)
+        self.scrollbar_LongQuestions.pack(side=LEFT, fill=Y)
+        self.frame_display_quick_quesitons.pack(side=LEFT, fill=X, expand=YES, padx=(20, 25))
+        self.frame_display_long_quesitons.pack(side=LEFT, fill=X, expand=YES, padx=(20, 25))
+        self.frame_display.pack(fill=X, pady=(0, 10))
+
+    def TimeCount(self, time):
+        if time < 60:
+            return "a few seconds ago"
+        elif time < 120:
+            return "a minute ago"
+        elif time < 3600:
+            return "{} minutes ago".format((time/60)(int))
+        elif time < 7200:
+            return "1 hour ago"
+        else:
+            return "{} hours ago".format((time/3600)(int))
+
+    def UIupdate(self): # Update real time information #
+
+        count_quick = 0
+        count_long = 0
+        
+        for QuickQuestion in self.QuickQuestions:
+            if not QuickQuestion.accept:
+                count_quick +=1
+        for LongQuestion in self.LongQuestions:
+            if not LongQuestion.accept:
+                count_long +=1
+                
+        if count_quick == 0:
+            self.label_statistics_QuickQuestions.config(text="No students in queue.")
+        else:
+            count = 0
+            for QuickQuestion in self.QuickQuestions:
+                count = count + QuickQuestion.time
+            average = count/count_quick
+            self.label_statistics_QuickQuestions.config(text="An average wait time of {} for {} student.".format(self.TimeCount(average), count_quick))
+
+        if count_long == 0:
+            self.label_statistics_LongQuestions.config(text="No students in queue.")
+        else:
+            count = 0
+            for LongQuestion in self.LongQuestions:
+                count = count + LongQuestion.time
+            average = count / count_long
+            self.label_statistics_LongQuestions.config(text="An average wait time of {} for {} student.".format(self.TimeCount(average), count_long))
+            
+        self.queue_data_update()
+
+    def QQuestionsCommand(self): #Add command for Quick request button #
+        res = askstring("Input Name", "Please input your name")
+        if res and len(res) > 0:
+            question = None
+            for QuickQuestion in self.QuickQuestions:
+                if QuickQuestion.name == res:
+                    question = QuickQuestion
+                    if not QuickQuestion.accept:
+                        if messagebox.askyesno("Cannot Join the Queue twice", "You can only queue once, want to play a game?"):Game(Toplevel())
+                        return
+                    
+                    question.accept = False
+                    question.time = 0
+                    question.count +=1
+                    break
+                
+            if not question:
+                question = Question(res, 0)
+                self.QuickQuestions.append(question)
+                
+            self.UIupdate()
+
+    def LQuestionsCommand(self): #Add command for Long request button #
+        res = askstring("Input Name", "Please input your name")
+        if res and len(res) > 0:
+            question = None
+            for LongQuestion in self.LongQuestions:
+                if LongQuestion.name == res:
+                    question = LongQuestion
+                    if not LongQuestion.accept:
+                        if messagebox.askyesno("Cannot Join the Queue twice", "You can only queue once, want to play a game?"):Game=Toplevel()
+                        return
+                    
+                    question.accept = False
+                    question.time = 0
+                    question.count +=1
+                    break
+                
+            if not question:
+                question = Question(res, 0)
+                self.LongQuestions.append(question)
+                
+            self.UIupdate()
+
+    def update_every_tensec(self): # Refresh every ten seconds #
+        for question in self.QuickQuestions:
+            if not question.accept:
+                question.time = question.time + 10
+        for question in self.LongQuestions:
+            if not question.accept:
+                question.time = question.time + 10
+                
+        self.UIupdate()
+        self.timer = threading.Timer(10, self.update_every_tensec)
+        self.timer.start()
+
+    def gridFind(self, frame, row, column):
+        for children in frame.winfo_children():
+            info = children.grid_info()
+            if info['row'] == row and info['column'] == column:
+                return children
+        return None
+
+    # handler and handler adapter #
+    
+    def handler(self, event, h):
+        widget_info = event.widget.grid_info()
+        row = widget_info['row']
+
+        if h == "quick":
+            name = self.gridFind(self.frame_canvas_QuickQuestions, row, 1).cget("text")
+            for question in self.QuickQuestions:
+                if question.name == name:
+                    question.accept = True
+                    break
+                
+        elif h == "long":
+            name = self.gridFind(self.frame_canvas_LongQuestions, row, 1).cget("text")
+            for question in self.LongQuestions:
+                if question.name == name:
+                    question.accept = True
+                    break
+        self.UIupdate()
+
+    def handler_adapter(self, fun, **kwds):
+        return lambda event, fun=fun, kwds=kwds: fun(event, **kwds)
+    
+    def queue_data_update(self): #update table data#
+        
+        for child in self.frame_canvas_QuickQuestions.winfo_children():
+            child.destroy()
+        for child in self.frame_canvas_LongQuestions.winfo_children():
+            child.destroy()
+            
+        index = 0
+        
+        for question in self.QuickQuestions:
+            if not question.accept:
+                name = question.name
+                Label(self.frame_canvas_QuickQuestions, text=str(index + 1), bg="White", width=3, anchor=W,font=tkFont.Font(family='Arial', size=8)).grid(row=index, column=0)
+                Label(self.frame_canvas_QuickQuestions, text=name, bg="White", width=16, anchor=W,font=tkFont.Font(family='Arial', size=8)).grid(row=index, column=1)
+                Label(self.frame_canvas_QuickQuestions, text=question.count, bg="White", width=19, anchor=W,font=tkFont.Font(family='Arial', size=8)).grid(row=index, column=2)
+                Label(self.frame_canvas_QuickQuestions, text=self.TimeCount(question.time), bg="White",width=18, anchor=W, font=tkFont.Font(family='Arial', size=8)).grid(row=index, column=3)
+                LeftButton = Button(self.frame_canvas_QuickQuestions, relief=GROOVE, height=1, width=3,takefocus=FALSE, bg="lightcoral", pady=0, padx=0)
+                LeftButton.bind("<Button-1>", self.handler_adapter(self.handler, t="quick"))
+                RightButton = Button(self.frame_canvas_QuickQuestions, relief=GROOVE, height=1, width=3,takefocus=FALSE, bg="lightgreen", pady=0, padx=0)
+                RightButton.bind("<Button-1>", self.handler_adapter(self.handler, t="quick"))
+                LeftButton.grid(row=index, column=4)
+                RightButton.grid(row=index, column=5)
+                index +=1
+                
+        for question in self.LongQuestions:
+            if not question.accept:
+                name = question.name
+                Label(self.frame_canvas_LongQuestions, text=str(index + 1), bg="White", width=3, anchor=W,font=tkFont.Font(family='Arial', size=8)).grid(row=index, column=0)
+                Label(self.frame_canvas_LongQuestions, text=name, bg="White", width=16, anchor=W,font=tkFont.Font(family='Arial', size=8)).grid(row=index, column=1)
+                Label(self.frame_canvas_LongQuestions, text=question.count, bg="White", width=19, anchor=W,font=tkFont.Font(family='Arial', size=8)).grid(row=index, column=2)
+                Label(self.frame_canvas_LongQuestions, text=self.TimeCount(question.time), bg="White",width=18, anchor=W, font=tkFont.Font(family='Arial', size=8)).grid(row=index, column=3)
+                LeftButton = Button(self.frame_canvas_LongQuestions, relief=GROOVE, height=1, width=3,takefocus=FALSE,bg="lightcoral", pady=0, padx=0)
+                LeftButton.bind("<Button-1>", self.handler_adapter(self.handler, t="long"))
+                RightButton = Button(self.frame_canvas_LongQuestions, relief=GROOVE, height=1, width=3,takefocus=FALSE,bg="lightgreen", pady=0, padx=0)
+                RightButton.bind("<Button-1>", self.handler_adapter(self.handler, t="long"))
+                LeftButton.grid(row=index, column=4)
+                RightButton.grid(row=index, column=5)
+                index +=1
+
+    def cmp(self,a):
+        return a.count
+
+    def get_median(self,data):
+        size = len(data)
+        if size == 0:
+            return 0
+        data = sorted(data)
+        if size % 2 == 0:
+            median = (data[size//2]+data[size//2-1])/2
+            data[0] = median
+        if size % 2 == 1:
+            median = data[(size-1)//2]
+            data[0] = median
+        return data[0]
+
+    def get_mode(self,num):
+        dictnum = {}
+        for i in range(len(num)):
+            if num[i] in dictnum.keys():
+                dictnum[num[i]] += 1
+            else:
+                dictnum.setdefault(num[i], 1)
+        maxnum = 0
+        maxkey = 0
+        for j, l in dictnum.items():
+            if l > maxnum:
+                maxnum = l
+                maxkey = j
+        return maxkey
+
+
+    def button_master_cmd(self):
+        if self.topwindow_master:
+            self.topwindow_master.destroy()
+        self.topwindow_master = Toplevel()
+        self.topwindow_master.title("Queue Stat")
+        self.topwindow_master.config(bg="White")
+        self.topwindow_master.geometry("500x300")
+
+        self.list_question=[]
+        for question in self.QuickQuestions:
+            self.list_question.append(question)
+        for question in self.LongQuestions:
+            self.list_question.append(question)
+
+        for question in self.list_question:
+            print("{} {} {}".format(question.name,question.time,question.count))
+
+        self.list_question=sorted(self.list_question, key=lambda question:question.count,reverse=True)
+        for question in self.list_question:
+            print("{} {} {}".format(question.name, question.time, question.count))
+
+        self.frame_toplevel_left=Frame(self.topwindow_master,bg="White",width=150,height=300)
+        self.label_toplevel_left_top=Label(self.frame_toplevel_left,text="Leader:",height=1,bg="White",font=tkFont.Font(family='Arial', size=8, weight=tkFont.BOLD))
+        self.frame_toplevel_left_line=Frame(self.frame_toplevel_left,bg="gainsboro",height=2)
+
+
+        self.frame_toplevel_right=Frame(self.topwindow_master,bg="White",width=350,height=300)
+        self.label_toplevel_right_top = Label(self.frame_toplevel_right, text="Statistics:", height=1,width=100, bg="White",anchor=W,font=tkFont.Font(family='Arial', size=8, weight=tkFont.BOLD))
+        self.frame_toplevel_right_line = Frame(self.frame_toplevel_right, bg="gainsboro", height=2)
+
+        self.label_toplevel_left_top.pack(anchor=W)
+        self.frame_toplevel_left_line.pack(fill=X,anchor=N)
+        for index in range(0,10):
+            if index>len(self.list_question)-1:
+                break
+            Label(self.frame_toplevel_left, text=self.list_question[index].name, height=1, bg="White",anchor=N+W).pack(anchor=N+W)
+        self.frame_toplevel_left.pack(side=LEFT,fill=BOTH,expand=YES,padx=10,pady=10)
+
+        self.label_toplevel_right_top.pack(anchor=W)
+        self.frame_toplevel_right_line.pack(fill=X, anchor=N)
+
+        waittime=0.0
+        count=0
+        waitlist=[]
+        for question in self.list_question:
+            if not question.accept:
+                waittime=waittime+question.time
+                count=count+1
+                waitlist.append(question.time)
+        if count==0:
+            meanwait=0
+        else:
+            meanwait=float(waittime)/float(count)
+
+        medium=self.get_median(waitlist)
+        mode=self.get_mode(waitlist)
+
+
+        self.frame_mean_wait=Frame(self.frame_toplevel_right, bg="White")
+        self.label_mean_wait_left=Label(self.frame_mean_wait,text="Mean Wait Time:",width=20,anchor=W, bg="White",height=2,font=tkFont.Font(family='Arial', size=15, weight=tkFont.BOLD))
+        self.label_mean_wait_right=Label(self.frame_mean_wait,text="{0:.2f} s".format(meanwait), bg="White",height=2,font=tkFont.Font(family='Arial', size=20, weight=tkFont.BOLD))
+        self.label_mean_wait_left.pack(side=LEFT,anchor=W)
+        self.label_mean_wait_right.pack(side=LEFT,anchor=W)
+
+        self.frame_meduim_wait=Frame(self.frame_toplevel_right, bg="White")
+        self.label_meduim_wait_left = Label(self.frame_meduim_wait, text="Meduim Wait Time:",width=20,anchor=W, bg="White",height=2,font=tkFont.Font(family='Arial', size=15, weight=tkFont.BOLD))
+        self.label_medium_wait_right = Label(self.frame_meduim_wait, text="{} s".format(medium), bg="White",height=2,font=tkFont.Font(family='Arial', size=20, weight=tkFont.BOLD))
+        self.label_meduim_wait_left.pack(side=LEFT,anchor=W)
+        self.label_medium_wait_right.pack(side=LEFT,anchor=W)
+
+        self.frame_mode_wait=Frame(self.frame_toplevel_right, bg="White")
+        self.label_mode_wait_left = Label(self.frame_mode_wait, text="Mode Wait Time:",width=20,anchor=W, bg="White",height=2,font=tkFont.Font(family='Arial', size=15, weight=tkFont.BOLD))
+        self.label_mode_wait_right = Label(self.frame_mode_wait, text="{} s".format(mode), bg="White",height=2,font=tkFont.Font(family='Arial', size=20, weight=tkFont.BOLD))
+        self.label_mode_wait_left.pack(side=LEFT,anchor=W)
+        self.label_mode_wait_right.pack(side=LEFT,anchor=W)
+
+        self.frame_mean_wait.pack(anchor=W,fill=X,expand=YES)
+        self.frame_toplevel_right_line_1 = Frame(self.frame_toplevel_right, bg="gainsboro", height=2)
+        self.frame_toplevel_right_line_1.pack(fill=X,expand=YES)
+        self.frame_meduim_wait.pack(anchor=W,fill=X,expand=YES)
+        self.frame_toplevel_right_line_2 = Frame(self.frame_toplevel_right, bg="gainsboro", height=2)
+        self.frame_toplevel_right_line_2.pack(fill=X, expand=YES)
+        self.frame_mode_wait.pack(anchor=W,fill=X,expand=YES)
+        self.frame_toplevel_right.pack(side=LEFT,fill=BOTH,expand=YES,padx=10,pady=10)
+
+if __name__ == '__main__':
+    root = Tk()
+    app = MainBody(master=root)
+    app.mainloop()
+    app.timer.cancel()
+
+
